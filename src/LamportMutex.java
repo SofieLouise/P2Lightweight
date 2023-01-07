@@ -1,5 +1,3 @@
-package com.lasalle;
-
 import java.util.Map;
 
 public class LamportMutex  {

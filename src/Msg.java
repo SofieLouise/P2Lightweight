@@ -1,5 +1,3 @@
-package com.lasalle;
-
 public class Msg {
     private int token;
     private int src;

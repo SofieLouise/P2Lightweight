@@ -1,16 +1,23 @@
-package com.lasalle;
-
 import java.io.IOException;
 
-public class Main { // myId, serverPort,
+public class    Main { // myId, serverHeavyPort,
     private static int myID;
-    public static void main(String[] args) {
+
+    public static void main(String[] args) throws IOException {
         myID = Integer.parseInt(args[0]);
+        int port = Integer.parseInt(args[1]);
+        //Server server = new Server(myID, port + myID);
+        //Thread serverThread = new Thread(server);
+        //  serverThread.start();
+
         initializeConnections(myID);
+        Client client = new Client("localhost", myID, port);
+        Thread clientThread = new Thread(client);
+        clientThread.start();
 
-        LamportMutex lamportMutex = new LamportMutex(servers, clients, N, myID);
+        // LamportMutex lamportMutex = new LamportMutex(servers, clients, N, myID);
 
-        while (true) {
+       /* while (true) {
             try {
                 server.waitHeavyweight();
             } catch (IOException ioException) {
@@ -32,7 +39,8 @@ public class Main { // myId, serverPort,
                 ioException.printStackTrace();
             }
 
-        }
+        }*/
+
 
     }
 

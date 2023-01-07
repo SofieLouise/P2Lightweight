@@ -1,5 +1,3 @@
-package com.lasalle;
-
 import java.time.Clock;
 
 public class DirectClock {
