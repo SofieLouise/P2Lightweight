@@ -5,10 +5,15 @@ public class LamportMutex  {
     int[] q;
     int N;
     private Map<Integer, Server> serverInstances;
-    private Map<Integer, Client> clientInstances;
+    private Map<Integer, Connection> clientInstances;
+    private int id;
 
 
-    public LamportMutex (Map<Integer, Server> serverInstances, Map<Integer, Client> clientInstances, int N, int myId) {
+    private void initializeConnections(){
+    }
+
+
+    public LamportMutex (Map<Integer, Server> serverInstances, Map<Integer, Connection> clientInstances, int N, int myId) {
         this.serverInstances = serverInstances;
         this.clientInstances = clientInstances;
         this.N = N;
@@ -71,8 +76,8 @@ public class LamportMutex  {
     }
 
     private void broadCastMsg(String tag, int value) {
-        for(Client clientInstance : clientInstances.values()){
-            clientInstance.sendMessage(new Msg(v.myId, tag, value));
+        for(Connection connectionInstance : clientInstances.values()){
+            connectionInstance.sendMessage(new Msg(v.myId, tag, value));
         }
     }
 
