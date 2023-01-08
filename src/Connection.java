@@ -4,7 +4,9 @@ import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Connection {
     private ServerSocket serverSocket;
@@ -18,22 +20,26 @@ public class Connection {
     private int id;
     private int port;
     private int heavyPort;
+    private int generalPort;
 
-    public Connection(int myID, int myPort, int heavyPort) {
+    public Connection(int myID, int myPort, int heavyPort, int generalPort) {
         this.id = myID;
         this.port = myPort;
         this.heavyPort = heavyPort;
+        this.generalPort = generalPort;
     }
 
     void connectToLightWeights(int NUMBER_OF_LIGHTWEIGHTS) {
-        int expectedNodes = NUMBER_OF_LIGHTWEIGHTS - id;
+        int expectedNodes = NUMBER_OF_LIGHTWEIGHTS - id - 1;
 
-        if (NUMBER_OF_LIGHTWEIGHTS - id != 0) {
+        // Not the last one
+        if (NUMBER_OF_LIGHTWEIGHTS - id != 1) {
             createLightWeightServer(port);
             acceptLightweightConnections(expectedNodes);
         }
 
-        if (id != 1) {
+        // Not the first one
+        if (id != 0) {
             connectToLightweights();
         }
     }
@@ -51,31 +57,20 @@ public class Connection {
                 System.out.println("Retrying to connect to Heavyweight");
             }
         } while (!connected);
-
-        while (connected) {
-            Message input;
-            try {
-                input = (Message) inHeavy.readObject();
-                System.out.println("heavyweight message");
-                if (input.getTag().equals(Message.Tag.GO)) {
-                    System.out.println("DOING HARD WORK");
-                    Thread.sleep(2000);
-                    System.out.println("DONE HARD WORK");
-                    heavyOut.writeObject(new Message(Message.Tag.DONE));
-                }
-            } catch (IOException | ClassNotFoundException | InterruptedException ioException) {
-                ioException.printStackTrace();
-            }
-        }
     }
 
-    public void sendMessage(Msg msg) {
-        System.out.println("sending message");
+    public boolean waitHeavyweight() {
+        Message input;
         try {
-            heavyOut.writeObject(msg);
-        } catch (IOException e) {
+            input = (Message) inHeavy.readObject();
+            System.out.println("heavyweight message");
+            if (input.getTag().equals(Message.Tag.GO)) {
+                return true;
+            }
+        } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
+        return false;
     }
 
     public void createLightWeightServer(int myPort) {
@@ -96,7 +91,8 @@ public class Connection {
                     System.out.println("notes connected " + nodesConnected);
                     Socket socket = serverSocket.accept();
                     System.out.println("accepted new connection on server from" + socket.getPort());
-                    LightweightHandler handler = new LightweightHandler(socket, this);
+                    int id = socket.getPort() - generalPort;
+                    LightweightHandler handler = new LightweightHandler(socket, this, id);
                     nodesConnected += 1;
                 }
             } catch (IOException e) {
@@ -108,7 +104,7 @@ public class Connection {
 
     public void connectToLightweights() {
         int tempPort = port;
-        for (int i = id; i > 1; i--) {
+        for (int i = id; i > 0; i--) {
             tempPort = tempPort - 1;
             System.out.println("Connecting to " + tempPort);
             boolean succeeded = false;
@@ -116,7 +112,8 @@ public class Connection {
                 try {
                     Socket socket = new Socket(host, tempPort);
                     System.out.println("Connected to " + tempPort);
-                    LightweightHandler handler = new LightweightHandler(socket, this);
+                    int id = socket.getPort() - generalPort;
+                    LightweightHandler handler = new LightweightHandler(socket, this, id);
                     succeeded = true;
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -132,5 +129,28 @@ public class Connection {
 
     public void addLightweight(LightweightHandler lightweightHandler) {
         lightweights.add(lightweightHandler);
+    }
+
+    public Map<Integer, LightweightHandler> getLightweightMap() {
+        // map of lightweight handler to their id in a map
+        Map<Integer, LightweightHandler> lightweightMap = new HashMap<>();
+        for (LightweightHandler handler : lightweights) {
+            lightweightMap.put(handler.getId(), handler);
+        }
+        System.out.println("lightweight map size: " + lightweightMap.size());
+        return lightweightMap;
+    }
+
+    public void notifyHeavyweight() {
+        System.out.println("Notifying heavyweight");
+        try {
+            heavyOut.writeObject(new Message(Message.Tag.DONE));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public List<LightweightHandler> getLightweights() {
+        return lightweights;
     }
 }

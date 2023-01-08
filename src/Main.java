@@ -1,15 +1,11 @@
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
 
-public class    Main { // myId, heavyPort, general port, numberOfLightweights
+public class Main { // myId, heavyPort, general port, numberOfLightweights
     private static int myID;
     private static int generalPort;
     private static int heavyPort;
     private static int NUMBER_OF_LIGHTWEIGHTS;
     private static String host = "localhost";
-    List<Node> network = new ArrayList<>();
-
 
     public static void main(String[] args) throws IOException {
         if (args.length != 4) {
@@ -24,7 +20,9 @@ public class    Main { // myId, heavyPort, general port, numberOfLightweights
 
         int myPort = generalPort + myID;
 
-        Connection connection = new Connection(myID, myPort, heavyPort);
+        Connection connection = new Connection(myID, myPort, heavyPort, generalPort);
+
+        System.out.println("I am " + myID + " and my port is " + myPort);
 
         connection.connectToLightWeights(NUMBER_OF_LIGHTWEIGHTS);
 
@@ -39,33 +37,37 @@ public class    Main { // myId, heavyPort, general port, numberOfLightweights
 
         connection.connectToHeavyweight();
 
-        // LamportMutex lamportMutex = new LamportMutex(servers, clients, N, myID);
+        LamportMutex lamportMutex = new LamportMutex(connection.getLightweightMap(), NUMBER_OF_LIGHTWEIGHTS, myID);
 
-       /* while (true) {
-            try {
-                server.waitHeavyweight();
-            } catch (IOException ioException) {
-                ioException.printStackTrace();
+        while (true) {
+            while (!connection.waitHeavyweight()) {
+                try {
+                    System.out.println("Waiting for heavyweight...");
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
             }
-            requestCS();
+
+            // listen for incoming messages from the other nodes
+            for (LightweightHandler lightweight : connection.getLightweights()) {
+                new Thread(() -> {
+                    lightweight.listenForMessages(lamportMutex);
+                }).start();
+            }
+
+
+            lamportMutex.requestCS();
             for (int i = 0; i < 10; i++) {
-                System.out.println("I am process lightweight" + myID);
+                System.out.println(("I am the process lightweight" + myID + " and I am in the critical section"));
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-            releaseCS();
-            try {
-                client.notifyHeavyweight();
-            }catch (IOException ioException){
-                ioException.printStackTrace();
-            }
-
-        }*/
-
-
+            lamportMutex.releaseCS();
+            connection.notifyHeavyweight();
+        }
     }
-
 }

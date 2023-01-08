@@ -1,4 +1,6 @@
-public class Msg {
+import java.io.Serializable;
+
+public class Msg implements Serializable {
     private int token;
     private int src;
     private String tag;
@@ -18,5 +20,33 @@ public class Msg {
 
     public int getMessageInt() {
         return messageInt;
+    }
+
+    public int getToken() {
+        return token;
+    }
+
+    public void setToken(int token) {
+        this.token = token;
+    }
+
+    public int getSrc() {
+        return src;
+    }
+
+    public void setSrc(int src) {
+        this.src = src;
+    }
+
+    public String getTag() {
+        return tag;
+    }
+
+    public void setTag(String tag) {
+        this.tag = tag;
+    }
+
+    public void setMessageInt(int messageInt) {
+        this.messageInt = messageInt;
     }
 }
