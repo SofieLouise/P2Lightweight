@@ -1,26 +1,21 @@
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Connection {
     private ServerSocket serverSocket;
-    private Socket clientSocket;
+    private Socket clientSocketHeavyweight;
     private ObjectInputStream inHeavy;
-    ObjectOutputStream heavyOut;
-    private List<LightweightHandler> lightweights = new ArrayList<>();
+    private ObjectOutputStream heavyOut;
+    private final ConcurrentHashMap<Integer, LightweightHandler> lightweights = new ConcurrentHashMap<>();
 
-    private String host = "localhost";
+    private final String host = "localhost";
     private boolean connected = false;
-    private int id;
-    private int port;
-    private int heavyPort;
-    private int generalPort;
+    private final int id;
+    private final int port;
+    private final int heavyPort;
+    private final int generalPort;
 
     public Connection(int myID, int myPort, int heavyPort, int generalPort) {
         this.id = myID;
@@ -29,11 +24,11 @@ public class Connection {
         this.generalPort = generalPort;
     }
 
-    void connectToLightWeights(int NUMBER_OF_LIGHTWEIGHTS) {
-        int expectedNodes = NUMBER_OF_LIGHTWEIGHTS - id - 1;
+    void connectToLightWeights(int numberOfLightweights) {
+        int expectedNodes = numberOfLightweights - id - 1;
 
         // Not the last one
-        if (NUMBER_OF_LIGHTWEIGHTS - id != 1) {
+        if (numberOfLightweights - id != 1) {
             createLightWeightServer(port);
             acceptLightweightConnections(expectedNodes);
         }
@@ -45,18 +40,18 @@ public class Connection {
     }
 
     public void connectToHeavyweight() {
-        do {
+        while (!connected) {
             try {
-                clientSocket = new Socket("localhost", heavyPort);
-                heavyOut = new ObjectOutputStream(clientSocket.getOutputStream());
-                inHeavy = new ObjectInputStream(clientSocket.getInputStream());
+                clientSocketHeavyweight = new Socket("localhost", heavyPort);
+                heavyOut = new ObjectOutputStream(clientSocketHeavyweight.getOutputStream());
+                inHeavy = new ObjectInputStream(clientSocketHeavyweight.getInputStream());
                 connected = true;
                 System.out.println("connected to the heavyweight");
 
             } catch (IOException e) {
                 System.out.println("Retrying to connect to Heavyweight");
             }
-        } while (!connected);
+        }
     }
 
     public boolean waitHeavyweight() {
@@ -82,17 +77,26 @@ public class Connection {
         }
     }
 
-    public void acceptLightweightConnections(int EXPECTED_NODES) {
+    public void acceptLightweightConnections(int expectedNodes) {
         new Thread(() -> {
             int nodesConnected = 0;
-            System.out.println("accepting lightweights");
+            System.out.println("accepting lightweight connections");
             try {
-                while (nodesConnected < EXPECTED_NODES) {
-                    System.out.println("notes connected " + nodesConnected);
+                while (nodesConnected < expectedNodes) {
                     Socket socket = serverSocket.accept();
-                    System.out.println("accepted new connection on server from" + socket.getPort());
-                    int id = socket.getPort() - generalPort;
-                    LightweightHandler handler = new LightweightHandler(socket, this, id);
+
+                    LightweightHandler lightweight = new LightweightHandler(socket);
+
+                    int clientId = lightweight.fetchId();
+                    while (clientId == -1) {
+                        clientId = lightweight.fetchId();
+                        System.out.println("waiting for id from incoming connection");
+                    }
+
+                    System.out.println("accepted new connection from pid" + clientId);
+
+                    addLightweight(lightweight);
+
                     nodesConnected += 1;
                 }
             } catch (IOException e) {
@@ -101,22 +105,27 @@ public class Connection {
         }).start();
     }
 
-
     public void connectToLightweights() {
-        int tempPort = port;
+        int portTemp = port;
         for (int i = id; i > 0; i--) {
-            tempPort = tempPort - 1;
-            System.out.println("Connecting to " + tempPort);
+            portTemp = portTemp - 1;
+            System.out.println("Connecting to " + portTemp);
             boolean succeeded = false;
             while (!succeeded) {
                 try {
-                    Socket socket = new Socket(host, tempPort);
-                    System.out.println("Connected to " + tempPort);
-                    int id = socket.getPort() - generalPort;
-                    LightweightHandler handler = new LightweightHandler(socket, this, id);
+                    Socket socket = new Socket(host, portTemp);
+
+                    int socketId = getIdFromPortNumber(socket.getPort());
+                    System.out.println("Connected to " + socketId);
+                    LightweightHandler lightweight = new LightweightHandler(socket, socketId);
+
+                    lightweight.sendId(id);
+
+                    addLightweight(lightweight);
+
                     succeeded = true;
                 } catch (IOException e) {
-                    e.printStackTrace();
+                    System.out.println("Retrying to connect to " + portTemp);
                 }
             }
         }
@@ -127,18 +136,14 @@ public class Connection {
         return lightweights.size() - expectedNumberOfNodes == 0;
     }
 
-    public void addLightweight(LightweightHandler lightweightHandler) {
-        lightweights.add(lightweightHandler);
+    public synchronized void addLightweight(LightweightHandler lightweightHandler) {
+        int pid = lightweightHandler.getId();
+        System.out.println("adding lightweight " + pid);
+        lightweights.put(pid, lightweightHandler);
     }
 
-    public Map<Integer, LightweightHandler> getLightweightMap() {
-        // map of lightweight handler to their id in a map
-        Map<Integer, LightweightHandler> lightweightMap = new HashMap<>();
-        for (LightweightHandler handler : lightweights) {
-            lightweightMap.put(handler.getId(), handler);
-        }
-        System.out.println("lightweight map size: " + lightweightMap.size());
-        return lightweightMap;
+    public ConcurrentHashMap<Integer, LightweightHandler> getLightweightMap() {
+        return lightweights;
     }
 
     public void notifyHeavyweight() {
@@ -150,7 +155,7 @@ public class Connection {
         }
     }
 
-    public List<LightweightHandler> getLightweights() {
-        return lightweights;
+    private int getIdFromPortNumber(int port) {
+        return port - generalPort;
     }
 }

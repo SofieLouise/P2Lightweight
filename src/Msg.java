@@ -1,33 +1,23 @@
 import java.io.Serializable;
 
 public class Msg implements Serializable {
-    private int token;
     private int src;
-    private String tag;
-    private int messageInt;
+    private Tag tag;
+    private int value;
 
-    public Msg(int src, String tag, int messageInt) {
+    public Msg(int src, Tag tag, int value) {
         this.src = src;
         this.tag = tag;
-        this.messageInt = messageInt;
+        this.value = value;
     }
 
-    public Msg(int src, int token, String tag) {
-        this.token = token;
+    public Msg(int src, Tag tag) {
         this.src = src;
         this.tag = tag;
     }
 
-    public int getMessageInt() {
-        return messageInt;
-    }
-
-    public int getToken() {
-        return token;
-    }
-
-    public void setToken(int token) {
-        this.token = token;
+    public int getValue() {
+        return value;
     }
 
     public int getSrc() {
@@ -38,15 +28,23 @@ public class Msg implements Serializable {
         this.src = src;
     }
 
-    public String getTag() {
+    public Tag getTag() {
         return tag;
     }
 
-    public void setTag(String tag) {
+    public void setTag(Tag tag) {
         this.tag = tag;
     }
 
-    public void setMessageInt(int messageInt) {
-        this.messageInt = messageInt;
+    public void setValue(int value) {
+        this.value = value;
+    }
+
+    enum Tag {
+        OKAY,
+        REQUEST,
+        RELEASE,
+        ACK,
+        ID
     }
 }

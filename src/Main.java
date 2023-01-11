@@ -1,32 +1,26 @@
-import java.io.IOException;
+public class Main { // myId, heavyPort, general port, numberOfLightweights algorithm(LAM/RAM)
 
-public class Main { // myId, heavyPort, general port, numberOfLightweights
-    private static int myID;
-    private static int generalPort;
-    private static int heavyPort;
-    private static int NUMBER_OF_LIGHTWEIGHTS;
-    private static String host = "localhost";
-
-    public static void main(String[] args) throws IOException {
-        if (args.length != 4) {
-            System.out.println("Usage: java Main <myId> <heavyPort> <generalPort> <numberOfLightweights>");
+    public static void main(String[] args) {
+        if (args.length != 5) {
+            System.out.println("Usage: java Main <myId> <heavyPort> <generalPort> <numberOfLightweights> <algorithm>");
             System.exit(1);
         }
 
-        myID = Integer.parseInt(args[0]);
-        heavyPort = Integer.parseInt(args[1]);
-        generalPort = Integer.parseInt(args[2]);
-        NUMBER_OF_LIGHTWEIGHTS = Integer.parseInt(args[3]);
+        int myId = Integer.parseInt(args[0]);
+        int heavyPort = Integer.parseInt(args[1]);
+        int generalPort = Integer.parseInt(args[2]);
+        int numberOfLightweights = Integer.parseInt(args[3]);
+        Mutex.Algorithm algorithm = Mutex.Algorithm.valueOf(args[4]);
 
-        int myPort = generalPort + myID;
+        int myPort = generalPort + myId;
 
-        Connection connection = new Connection(myID, myPort, heavyPort, generalPort);
+        Connection connection = new Connection(myId, myPort, heavyPort, generalPort);
 
-        System.out.println("I am " + myID + " and my port is " + myPort);
+        System.out.println("I am " + myId + " and my port is " + myPort);
 
-        connection.connectToLightWeights(NUMBER_OF_LIGHTWEIGHTS);
+        connection.connectToLightWeights(numberOfLightweights);
 
-        while (!connection.areLightweightsSetup(NUMBER_OF_LIGHTWEIGHTS - 1)) {
+        while (!connection.areLightweightsSetup(numberOfLightweights - 1)) {
             try {
                 System.out.println("Waiting for lightweights to setup");
                 Thread.sleep(1000);
@@ -37,7 +31,7 @@ public class Main { // myId, heavyPort, general port, numberOfLightweights
 
         connection.connectToHeavyweight();
 
-        LamportMutex lamportMutex = new LamportMutex(connection.getLightweightMap(), NUMBER_OF_LIGHTWEIGHTS, myID);
+        Mutex mutex = getMutex(myId, numberOfLightweights, algorithm, connection);
 
         while (true) {
             while (!connection.waitHeavyweight()) {
@@ -49,25 +43,36 @@ public class Main { // myId, heavyPort, general port, numberOfLightweights
                 }
             }
 
-            // listen for incoming messages from the other nodes
-            for (LightweightHandler lightweight : connection.getLightweights()) {
+            for (LightweightHandler lightweight : connection.getLightweightMap().values()) {
                 new Thread(() -> {
-                    lightweight.listenForMessages(lamportMutex);
+                    lightweight.listenForMessages(mutex);
                 }).start();
             }
 
-
-            lamportMutex.requestCS();
+            mutex.requestCS();
             for (int i = 0; i < 10; i++) {
-                System.out.println(("I am the process lightweight" + myID + " and I am in the critical section"));
+                System.out.println(("I am the process lightweight " + myId + " and I am in the critical section"));
                 try {
                     Thread.sleep(1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
             }
-            lamportMutex.releaseCS();
+            mutex.releaseCS();
+
             connection.notifyHeavyweight();
         }
+    }
+
+    private static Mutex getMutex(int myId, int numberOfLightweights, Mutex.Algorithm algorithm, Connection connection) {
+        Mutex mutex;
+        if (algorithm.equals(Mutex.Algorithm.LAM)) {
+            mutex = new LamportMutex(connection.getLightweightMap(), numberOfLightweights, myId);
+        } else if (algorithm.equals(Mutex.Algorithm.RAM)) {
+            mutex = new RAMMutex(connection.getLightweightMap(), numberOfLightweights, myId);
+        } else {
+            throw new IllegalArgumentException("Unknown algorithm: " + algorithm);
+        }
+        return mutex;
     }
 }
