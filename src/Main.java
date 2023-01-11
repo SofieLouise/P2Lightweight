@@ -42,25 +42,26 @@ public class Main { // myId, heavyPort, general port, numberOfLightweights algor
                     e.printStackTrace();
                 }
             }
+            //connection.joinExistingLightweightThreads();
 
-            for (LightweightHandler lightweight : connection.getLightweightMap().values()) {
-                new Thread(() -> {
-                    lightweight.listenForMessages(mutex);
-                }).start();
-            }
+            connection.listenForLightweightMessages(mutex);
 
             mutex.requestCS();
-            for (int i = 0; i < 10; i++) {
-                System.out.println(("I am the process lightweight " + myId + " and I am in the critical section"));
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-            }
+            printToScreen(myId);
             mutex.releaseCS();
 
             connection.notifyHeavyweight();
+        }
+    }
+
+    private static void printToScreen(int myId) {
+        for (int i = 0; i < 10; i++) {
+            System.out.println(("I am the process lightweight " + myId + " and I am in the critical section"));
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
         }
     }
 

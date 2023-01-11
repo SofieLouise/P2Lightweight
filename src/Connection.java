@@ -9,6 +9,7 @@ public class Connection {
     private ObjectInputStream inHeavy;
     private ObjectOutputStream heavyOut;
     private final ConcurrentHashMap<Integer, LightweightHandler> lightweights = new ConcurrentHashMap<>();
+    private ConcurrentHashMap<Integer, Thread> lightweightThreads = new ConcurrentHashMap<>();
 
     private final String host = "localhost";
     private boolean connected = false;
@@ -24,7 +25,31 @@ public class Connection {
         this.generalPort = generalPort;
     }
 
-    void connectToLightWeights(int numberOfLightweights) {
+    public void listenForLightweightMessages(Mutex mutex) {
+        if(lightweightThreads.isEmpty()){
+            for (LightweightHandler lightweight : lightweights.values()) {
+                Thread listeningThread = new Thread(() -> {
+                    lightweight.listenForMessages(mutex);
+                });
+                lightweightThreads.put(lightweight.getId(), listeningThread);
+                listeningThread.start();
+            }
+        }
+    }
+
+    public void joinExistingLightweightThreads(){
+        for (Thread thread :
+                lightweightThreads.values()) {
+            try {
+                thread.join();
+            } catch (InterruptedException e) {
+                System.out.println("Thread interrupted during join");
+            }
+        }
+        lightweightThreads = new ConcurrentHashMap<>();
+    }
+
+    public void connectToLightWeights(int numberOfLightweights) {
         int expectedNodes = numberOfLightweights - id - 1;
 
         // Not the last one
@@ -58,8 +83,8 @@ public class Connection {
         Message input;
         try {
             input = (Message) inHeavy.readObject();
-            System.out.println("heavyweight message");
             if (input.getTag().equals(Message.Tag.GO)) {
+                System.out.println("Message from Heavyweight");
                 return true;
             }
         } catch (IOException | ClassNotFoundException e) {

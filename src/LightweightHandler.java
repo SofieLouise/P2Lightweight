@@ -2,26 +2,26 @@ import java.io.*;
 import java.net.Socket;
 
 public class LightweightHandler {
-    private Socket client;
+    private Socket socket;
     private ObjectInputStream in;
     private ObjectOutputStream out;
     private Connection connection;
     private int id;
     private int port;
 
-    public LightweightHandler(Socket client, int id) {
-        this.client = client;
+    public LightweightHandler(Socket socket, int id) {
+        this.socket = socket;
         this.id = id;
     }
 
-    public LightweightHandler(Socket client) {
-        this.client = client;
+    public LightweightHandler(Socket socket) {
+        this.socket = socket;
     }
 
     public int fetchId() {
         try {
             if (in == null) {
-                in = new ObjectInputStream(client.getInputStream());
+                in = new ObjectInputStream(socket.getInputStream());
             }
             Msg msg = (Msg) in.readObject();
             while (!msg.getTag().equals(Msg.Tag.ID)) {
@@ -43,13 +43,16 @@ public class LightweightHandler {
     public void sendMessage(Msg msg) {
         try {
             if (out == null) {
-                out = new ObjectOutputStream(client.getOutputStream());
+                out = new ObjectOutputStream(socket.getOutputStream());
             }
             try {
+                System.out.println("Sending message " + msg.getTag() + " to " + id);
                 out.writeObject(msg);
                 out.flush();
-            } catch (NotSerializableException e) { // if stream is closed
-                out = new ObjectOutputStream(client.getOutputStream());
+            } catch (NotSerializableException e) {
+                System.out.println("Stream is closed. Opening a new one");
+                out = new ObjectOutputStream(socket.getOutputStream());
+                System.out.println("Sending message " + msg.getTag() + " to " + id);
                 out.writeObject(msg);
                 out.flush();
             }
@@ -59,14 +62,21 @@ public class LightweightHandler {
     }
 
     public void listenForMessage(Mutex mutex) {
+        System.out.println("Listening for incoming messages...");
         try {
+            if(!socket.isConnected() || socket.isClosed()) {
+                System.out.println("Socket is closed");
+                return;
+            }
             if (in == null) {
-                in = new ObjectInputStream(client.getInputStream());
+                in = new ObjectInputStream(socket.getInputStream());
             }
             Msg msg = (Msg) in.readObject();
             mutex.handleMsg(msg, msg.getSrc(), msg.getTag());
-        } catch (IOException | ClassNotFoundException ioException) {
-            ioException.printStackTrace();
+        } catch (EOFException e) {
+            System.out.println("Connection closed");
+        } catch (IOException | ClassNotFoundException e) {
+            e.printStackTrace();
         }
     }
 
@@ -76,7 +86,7 @@ public class LightweightHandler {
 
     public void listenForMessages(Mutex mutex) {
         while (true) {
-            if (client.isConnected() && !client.isClosed()) {
+            if (socket.isConnected() && !socket.isClosed()) {
                 listenForMessage(mutex);
             }
         }

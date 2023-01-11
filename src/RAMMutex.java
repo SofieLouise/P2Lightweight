@@ -25,6 +25,7 @@ public class RAMMutex implements Mutex {
         broadcastMsg(Msg.Tag.REQUEST, myTs);
         while (numOkay < N - 1) {
             try {
+                System.out.println("Waiting for okay");
                 wait(1000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -48,6 +49,7 @@ public class RAMMutex implements Mutex {
         int timeStamp = message.getValue();
         c.receiveAction(src, timeStamp);
         System.out.println("Received message from " + src + " with tag " + tag + " and timestamp " + timeStamp);
+
         if (tag.equals(Msg.Tag.REQUEST)) {
             if (myTs == Integer.MAX_VALUE || (timeStamp < myTs) || (timeStamp == myTs && (src < myId))) {
                 lightweights.get(src).sendMessage(new Msg(myId, Msg.Tag.OKAY, c.getValue()));
@@ -58,6 +60,7 @@ public class RAMMutex implements Mutex {
         } else if (tag.equals(Msg.Tag.OKAY)) {
             numOkay++;
             if (numOkay == N - 1) {
+                System.out.println("Notifying okay");
                 notifyAll();
             }
         } else if (tag.equals(Msg.Tag.RELEASE)) {
